@@ -1,0 +1,1285 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>旅行夾錢神器 Pro</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+      background-color: #f1f5f9;
+      -webkit-tap-highlight-color: transparent;
+      padding-bottom: 95px;
+    }
+    .ios-card {
+      background: #ffffff;
+      border-radius: 18px;
+      box-shadow: 0 2px 10px rgba(15, 23, 42, 0.05);
+    }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+</head>
+<body class="text-slate-800">
+
+  <!-- 頂部 Header & 公數 Pool 獨立結餘看板 -->
+  <header class="bg-gradient-to-br from-blue-600 via-indigo-600 to-indigo-800 text-white pt-4 pb-5 px-4 rounded-b-3xl shadow-lg sticky top-0 z-20">
+    <div class="max-w-md mx-auto">
+      <div class="flex justify-between items-center mb-3">
+        <div>
+          <span class="text-[11px] uppercase tracking-wider bg-white/20 px-2 py-0.5 rounded-full font-semibold">iOS 原幣清公數版</span>
+          <h1 id="tripTitleDisplay" class="text-xl font-bold mt-1 flex items-center gap-1.5 cursor-pointer" onclick="editTripTitle()">
+            <span>🇯🇵 日本旅行夾錢</span>
+            <span class="text-xs opacity-75">✏️</span>
+          </h1>
+        </div>
+        <div class="text-right">
+          <div class="text-[11px] text-blue-100">旅程總消費 (折合港幣)</div>
+          <div id="totalTripHKD" class="text-2xl font-extrabold tracking-tight">HK$ 0</div>
+        </div>
+      </div>
+
+      <!-- 金色公數 Pool 實時看板 -->
+      <div class="bg-gradient-to-r from-amber-400/95 to-yellow-500/95 text-slate-900 rounded-2xl p-3.5 shadow-md">
+        <div class="flex justify-between items-center border-b border-amber-700/15 pb-2 mb-2">
+          <div>
+            <div class="text-[11px] font-bold uppercase tracking-wide text-amber-950/80 flex items-center gap-1">
+              <span>💰 公數 Pool 原幣現金池</span>
+              <span id="poolMainCurrencyBadge" class="bg-amber-900/15 px-1.5 py-0.2 rounded text-[10px]">JPY</span>
+            </div>
+            <div id="poolRemainingDisplay" class="text-xl font-black text-slate-900 mt-0.5">¥ 0</div>
+            <div id="poolRemainingHKDDisplay" class="text-[11px] font-semibold text-amber-950/80">≈ HK$ 0</div>
+          </div>
+          <div class="text-right text-xs space-y-0.5">
+            <div class="text-amber-950">累積入池: <span id="poolTotalInDisplay" class="font-bold">¥ 0</span></div>
+            <div class="text-amber-950">公數已洗: <span id="poolTotalOutDisplay" class="font-bold">¥ 0</span></div>
+            <button onclick="openModal('pool_topup')" class="mt-1 bg-slate-900 text-amber-300 font-bold px-2.5 py-1 rounded-lg text-[11px] shadow active:scale-95 transition">
+              ＋ 夾公數入池
+            </button>
+          </div>
+        </div>
+
+        <!-- 每個人嘅獨立公數原幣 Balance -->
+        <div class="text-[11px] font-bold text-amber-950 mb-1 flex justify-between">
+          <span>👤 各人目前公數原幣結餘 (邊個夾加邊個、邊個食扣邊個)：</span>
+        </div>
+        <div id="memberPoolBalances" class="flex gap-1.5 overflow-x-auto no-scrollbar pt-0.5"></div>
+      </div>
+    </div>
+  </header>
+
+  <!-- 主內容區 -->
+  <main class="max-w-md mx-auto px-3.5 pt-4">
+
+    <!-- 分頁 1: 數簿明細 -->
+    <section id="tab-expenses" class="space-y-3">
+      <div class="flex justify-between items-center px-1">
+        <h2 class="font-bold text-slate-700 text-sm">📋 單據及公數入池記錄 (<span id="txCount">0</span>)</h2>
+        <div class="flex gap-1.5">
+          <button onclick="exportCSV()" class="text-xs bg-emerald-600 text-white font-semibold px-2.5 py-1.5 rounded-xl shadow-sm active:scale-95 transition">
+            📊 匯出 Excel CSV
+          </button>
+        </div>
+      </div>
+      <div id="expenseList" class="space-y-2.5"></div>
+    </section>
+
+    <!-- 分頁 2: 找數計數 -->
+    <section id="tab-settle" class="space-y-4 hidden">
+      <!-- 公數結餘處理模式切換 -->
+      <div class="ios-card p-4 border-l-4 border-amber-500">
+        <div class="flex justify-between items-start gap-2">
+          <div>
+            <h3 class="font-bold text-sm text-slate-800">💰 公數袋結餘點樣清數？</h3>
+            <p class="text-xs text-slate-500 mt-0.5">
+              預設支援以<b>原先夾公數嘅外幣（例如 <span class="poolCurText">JPY</span>）</b>退還現金，亦可以揀折合港幣一併過數。
+            </p>
+          </div>
+        </div>
+        <div class="grid grid-cols-3 gap-1.5 mt-3">
+          <button id="btnModeRefundNative" onclick="setPoolSettleMode('refund_native')" class="py-2 px-1.5 rounded-xl text-xs font-bold border text-center transition">
+            💵 退返原幣現金<br><span class="font-normal text-[10px] opacity-80">公數還 <span class="poolCurText">JPY</span></span>
+          </button>
+          <button id="btnModeActive" onclick="setPoolSettleMode('active')" class="py-2 px-1.5 rounded-xl text-xs font-bold border text-center transition">
+            🏃 旅程進行中<br><span class="font-normal text-[10px] opacity-80">公數繼續留住用</span>
+          </button>
+          <button id="btnModeRefundHKD" onclick="setPoolSettleMode('refund_hkd')" class="py-2 px-1.5 rounded-xl text-xs font-bold border text-center transition">
+            📲 折合港幣退還<br><span class="font-normal text-[10px] opacity-80">連私人數夾埋過數</span>
+          </button>
+        </div>
+
+        <div id="custodianSelectorBox" class="mt-3 pt-2.5 border-t border-slate-100">
+          <label class="text-xs font-bold text-slate-700 block mb-1">👛 邊個負責揸住個公數銀包（保管公數現金）？</label>
+          <select id="poolCustodianSelect" onchange="changeCustodian(this.value)" class="w-full bg-slate-100 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800">
+          </select>
+        </div>
+      </div>
+
+      <!-- 區塊 A: 公數 Pool 原幣清數方案 (以原幣 JPY/KRW 結算) -->
+      <div id="nativePoolSettlementCard" class="ios-card p-4 border border-amber-300 bg-amber-50/40">
+        <div class="flex justify-between items-center mb-2.5">
+          <div>
+            <h3 class="font-extrabold text-slate-900 text-sm flex items-center gap-1.5">
+              <span>💵 公數 Pool 原幣清數表</span>
+              <span class="bg-amber-400 text-slate-900 text-[10px] px-2 py-0.5 rounded-md font-black poolCurText">JPY</span>
+            </h3>
+            <p id="nativePoolSubtitle" class="text-[11px] text-slate-500 mt-0.5"></p>
+          </div>
+          <button onclick="copyWhatsAppSummary()" class="bg-green-600 text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow active:scale-95 transition shrink-0">
+            📲 複製 WhatsApp 表
+          </button>
+        </div>
+        <div id="nativePoolActionsList" class="space-y-2"></div>
+      </div>
+
+      <!-- 區塊 B: 私人墊支港幣過數方案 (PayMe / FPS) -->
+      <div class="ios-card p-4">
+        <div class="flex justify-between items-center mb-3">
+          <div>
+            <h3 id="hkdTransferTitle" class="font-bold text-slate-800 text-sm">💳 私人墊支找數方案 (港幣 HKD)</h3>
+            <p id="hkdTransferSubtitle" class="text-[11px] text-slate-400 mt-0.5">只計私人出錢墊支嘅單據，方便返香港用 PayMe / FPS 過數</p>
+          </div>
+        </div>
+        <div id="settlementTransfers" class="space-y-2"></div>
+      </div>
+
+      <!-- 各人獨立公數 (原幣) + 私人數 (港幣) 明細表 -->
+      <div class="ios-card p-4">
+        <h3 class="font-bold text-slate-800 text-sm mb-2.5">📊 各人公數結餘 (<span class="poolCurText">JPY</span>) & 私人墊支 (HKD) 總表</h3>
+        <div id="memberBreakdownList" class="space-y-2.5"></div>
+      </div>
+    </section>
+
+    <!-- 分頁 3: 旅伴/匯率/備份 -->
+    <section id="tab-settings" class="space-y-4 hidden">
+      <!-- 旅伴管理 -->
+      <div class="ios-card p-4">
+        <h3 class="font-bold text-slate-800 text-sm mb-2">👥 旅伴名單 (<span id="memberCountDisplay">0</span>人)</h3>
+        <div class="flex gap-2 mb-3">
+          <input id="newMemberInput" type="text" placeholder="輸入新旅伴名 (例如: 阿強)" class="flex-1 bg-slate-100 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          <button onclick="addMember()" class="bg-blue-600 text-white font-bold px-4 py-2 rounded-xl text-sm active:scale-95 transition">＋新增</button>
+        </div>
+        <div id="memberManageList" class="flex flex-wrap gap-2"></div>
+      </div>
+
+      <!-- 匯率設定 -->
+      <div class="ios-card p-4">
+        <div class="flex justify-between items-center mb-2">
+          <h3 class="font-bold text-slate-800 text-sm">💱 貨幣匯率設定 (1 外幣 = ? HKD)</h3>
+          <select id="poolCurrencySelect" onchange="changePoolCurrency(this.value)" class="text-xs bg-amber-100 text-amber-900 font-bold px-2 py-1 rounded-lg">
+            <option value="JPY">公數原幣: JPY 日圓</option>
+            <option value="KRW">公數原幣: KRW 韓元</option>
+            <option value="TWD">公數原幣: TWD 台幣</option>
+            <option value="THB">公數原幣: THB 泰銖</option>
+            <option value="HKD">公數原幣: HKD 港幣</option>
+            <option value="USD">公數原幣: USD 美金</option>
+            <option value="EUR">公數原幣: EUR 歐元</option>
+            <option value="GBP">公數原幣: GBP 英鎊</option>
+            <option value="CNY">公數原幣: CNY 人民幣</option>
+          </select>
+        </div>
+        <div id="rateSettingsList" class="grid grid-cols-2 gap-2.5 mt-2"></div>
+      </div>
+
+      <!-- 備份及還原 -->
+      <div class="ios-card p-4 space-y-3">
+        <h3 class="font-bold text-slate-800 text-sm">🛡️ 備份及還原數據</h3>
+        <div class="grid grid-cols-2 gap-2">
+          <button onclick="exportCSV()" class="bg-emerald-600 text-white font-bold py-2.5 rounded-xl text-xs shadow-sm">📊 下載 Excel CSV</button>
+          <button onclick="downloadJSON()" class="bg-indigo-600 text-white font-bold py-2.5 rounded-xl text-xs shadow-sm">💾 下載 JSON 備份檔</button>
+        </div>
+        <div class="flex gap-2">
+          <button onclick="copyJSONText()" class="flex-1 bg-slate-800 text-white font-bold py-2 rounded-xl text-xs">📋 複製備份碼</button>
+          <button onclick="promptRestoreJSON()" class="flex-1 bg-amber-500 text-slate-900 font-bold py-2 rounded-xl text-xs">📥 貼上備份碼還原</button>
+        </div>
+        <div class="pt-2 border-t border-slate-100 flex justify-between items-center">
+          <span class="text-xs text-slate-400">載入預設「5人先夾公數 + 2人後補夾」測試例子</span>
+          <button onclick="resetToDemo()" class="text-xs text-red-600 font-bold underline">重置為示範數據</button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- 底部 iOS 導航欄 -->
+  <nav class="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-slate-200 px-4 py-2 z-30">
+    <div class="max-w-md mx-auto flex justify-around items-center">
+      <button onclick="switchTab('expenses')" id="nav-expenses" class="flex flex-col items-center text-blue-600 font-bold text-xs">
+        <span class="text-lg">🧾</span>
+        <span>數簿明細</span>
+      </button>
+
+      <button onclick="openModal('expense')" class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold px-5 py-2.5 rounded-2xl shadow-lg -mt-5 flex items-center gap-1.5 active:scale-95 transition">
+        <span class="text-base">＋</span>
+        <span class="text-sm">記一筆</span>
+      </button>
+
+      <button onclick="switchTab('settle')" id="nav-settle" class="flex flex-col items-center text-slate-400 font-semibold text-xs">
+        <span class="text-lg">🧮</span>
+        <span>找數計數</span>
+      </button>
+
+      <button onclick="switchTab('settings')" id="nav-settings" class="flex flex-col items-center text-slate-400 font-semibold text-xs">
+        <span class="text-lg">⚙️</span>
+        <span>旅伴/匯率</span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- 記帳 / 夾公數 Modal -->
+  <div id="txModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-40 hidden flex items-end sm:items-center justify-center">
+    <div class="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-5 max-h-[92vh] overflow-y-auto shadow-2xl">
+      <div class="flex justify-between items-center mb-3">
+        <h3 id="modalTitle" class="font-extrabold text-base text-slate-800">記一筆消費</h3>
+        <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600 font-bold text-lg px-2">✕</button>
+      </div>
+
+      <!-- 模式切換: 一般消費 vs 夾公數入池 -->
+      <div class="grid grid-cols-2 gap-2 bg-slate-100 p-1 rounded-2xl mb-4">
+        <button id="typeBtnExpense" onclick="setModalType('expense')" class="py-2 rounded-xl text-xs font-bold transition">🛍️ 記消費 (公數/私人出)</button>
+        <button id="typeBtnTopup" onclick="setModalType('pool_topup')" class="py-2 rounded-xl text-xs font-bold transition">💰 夾公數入池 (充值)</button>
+      </div>
+
+      <div class="space-y-3.5">
+        <!-- 項目名稱 & 日期 -->
+        <div class="grid grid-cols-3 gap-2">
+          <div class="col-span-2">
+            <label class="text-xs font-bold text-slate-600 block mb-1">項目名稱</label>
+            <input id="txTitle" type="text" placeholder="例如：Day 1 燒肉晚餐" class="w-full bg-slate-100 rounded-xl px-3 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+          <div>
+            <label class="text-xs font-bold text-slate-600 block mb-1">日期</label>
+            <input id="txDate" type="date" class="w-full bg-slate-100 rounded-xl px-2.5 py-2 text-xs font-medium" />
+          </div>
+        </div>
+
+        <!-- 貨幣與金額 -->
+        <div class="grid grid-cols-3 gap-2">
+          <div>
+            <label class="text-xs font-bold text-slate-600 block mb-1">貨幣</label>
+            <select id="txCurrency" onchange="updateModalPreview()" class="w-full bg-slate-100 rounded-xl px-3 py-2 text-sm font-bold">
+              <option value="JPY">JPY 日圓</option>
+              <option value="KRW">KRW 韓元</option>
+              <option value="TWD">TWD 台幣</option>
+              <option value="THB">THB 泰銖</option>
+              <option value="HKD">HKD 港幣</option>
+              <option value="USD">USD 美金</option>
+              <option value="EUR">EUR 歐元</option>
+              <option value="GBP">GBP 英鎊</option>
+              <option value="CNY">CNY 人民幣</option>
+            </select>
+          </div>
+          <div class="col-span-2">
+            <label id="amountLabel" class="text-xs font-bold text-slate-600 block mb-1">消費總金額</label>
+            <input id="txAmount" type="number" step="any" oninput="updateModalPreview()" placeholder="輸入總金額 (例如 50000)" class="w-full bg-slate-100 rounded-xl px-3 py-2 text-base font-extrabold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+        </div>
+        <div id="hkdPreviewText" class="text-right text-xs font-bold text-blue-600 -mt-2">折合 HK$ 0.00</div>
+
+        <!-- 付款人選擇 (只喺「記消費」顯示) -->
+        <div id="payerSection">
+          <label class="text-xs font-bold text-slate-600 block mb-1.5">邊個出錢俾單？</label>
+          <div id="payerButtons" class="grid grid-cols-3 gap-2"></div>
+        </div>
+
+        <!-- 參與者 / 邊個有份夾 / 邊個有份食 -->
+        <div>
+          <div class="flex justify-between items-center mb-1.5">
+            <label id="participantsLabel" class="text-xs font-bold text-slate-600">邊幾個有份食 / 參與？</label>
+            <div class="flex gap-2">
+              <button type="button" onclick="selectAllParticipants(true)" class="text-[11px] text-blue-600 font-bold">全選</button>
+              <button type="button" onclick="selectAllParticipants(false)" class="text-[11px] text-slate-400 font-bold">清空</button>
+            </div>
+          </div>
+
+          <!-- 分帳方式 (平均 / 自訂金額) -->
+          <div class="grid grid-cols-2 gap-1.5 bg-slate-100 p-1 rounded-xl mb-2">
+            <button type="button" id="splitBtnEqual" onclick="setSplitMode('equal')" class="py-1 rounded-lg text-xs font-bold bg-white shadow-xs">平均除開</button>
+            <button type="button" id="splitBtnExact" onclick="setSplitMode('exact')" class="py-1 rounded-lg text-xs font-bold text-slate-500">自訂每人金額</button>
+          </div>
+
+          <div id="participantListBox" class="space-y-1.5 max-h-52 overflow-y-auto pr-1"></div>
+        </div>
+
+        <!-- 即時公數扣減 / 入池預覽提示 -->
+        <div id="poolImpactAlert" class="bg-amber-50 border border-amber-300 rounded-2xl p-3 text-xs text-amber-950"></div>
+
+        <button onclick="saveTransaction()" class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-extrabold py-3 rounded-2xl shadow-lg text-sm active:scale-95 transition">
+          ✅ 確認儲存單據
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast 提示 -->
+  <div id="toast" class="fixed top-4 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-xs font-bold px-4 py-2.5 rounded-2xl shadow-xl z-50 hidden"></div>
+
+  <script>
+    const STORAGE_KEY = 'hk_trip_split_native_pool_v4';
+
+    const DEFAULT_RATES = {
+      JPY: 0.052,
+      KRW: 0.0058,
+      TWD: 0.24,
+      THB: 0.22,
+      HKD: 1.0,
+      USD: 7.8,
+      EUR: 8.4,
+      GBP: 9.9,
+      CNY: 1.08
+    };
+
+    const CURRENCY_SYMBOLS = {
+      JPY: '¥', KRW: '₩', TWD: 'NT$', THB: '฿', HKD: 'HK$', USD: 'US$', EUR: '€', GBP: '£', CNY: '¥'
+    };
+
+    function getDemoState() {
+      return {
+        tripTitle: '🇯🇵 日本旅行夾錢 (原幣清公數版)',
+        poolCurrency: 'JPY',
+        poolSettleMode: 'refund_native', // 'refund_native' | 'active' | 'refund_hkd'
+        poolCustodian: 'm1',
+        rates: { ...DEFAULT_RATES },
+        members: [
+          { id: 'm1', name: 'Alex(公數袋主)' },
+          { id: 'm2', name: '阿B' },
+          { id: 'm3', name: 'Ceci' },
+          { id: 'm4', name: '大頭' },
+          { id: 'm5', name: 'Eric' },
+          { id: 'm6', name: 'Frankie(Day2到)' },
+          { id: 'm7', name: 'Gigi(Day2到)' }
+        ],
+        transactions: [
+          {
+            id: 'tx1',
+            type: 'pool_topup',
+            title: 'Day 1: 頭5人夾公數入池 (每人¥10,000)',
+            date: '2026-11-01',
+            currency: 'JPY',
+            amount: 50000,
+            payer: 'POOL',
+            splitMode: 'equal',
+            participants: ['m1', 'm2', 'm3', 'm4', 'm5'],
+            exactAmounts: {}
+          },
+          {
+            id: 'tx2',
+            type: 'expense',
+            title: 'Day 1: 5人食燒肉晚餐 (公數出)',
+            date: '2026-11-01',
+            currency: 'JPY',
+            amount: 20000,
+            payer: 'POOL',
+            splitMode: 'equal',
+            participants: ['m1', 'm2', 'm3', 'm4', 'm5'],
+            exactAmounts: {}
+          },
+          {
+            id: 'tx3',
+            type: 'pool_topup',
+            title: 'Day 2: Frankie & Gigi 加入補夾公數 (每人¥6,000)',
+            date: '2026-11-02',
+            currency: 'JPY',
+            amount: 12000,
+            payer: 'POOL',
+            splitMode: 'equal',
+            participants: ['m6', 'm7'],
+            exactAmounts: {}
+          }
+        ]
+      };
+    }
+
+    let state = loadState();
+    let modalType = 'expense';
+    let modalPayer = 'POOL';
+    let modalSplitMode = 'equal';
+    let modalParticipants = [];
+    let modalExactAmounts = {};
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return getDemoState();
+        const parsed = JSON.parse(raw);
+        if (!parsed.members || !parsed.transactions) return getDemoState();
+        // 兼容舊版 mode 名稱
+        if (parsed.poolSettleMode === 'refund') parsed.poolSettleMode = 'refund_native';
+        return {
+          ...getDemoState(),
+          ...parsed,
+          rates: { ...DEFAULT_RATES, ...(parsed.rates || {}) }
+        };
+      } catch (e) {
+        return getDemoState();
+      }
+    }
+
+    function saveState() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      renderAll();
+    }
+
+    function showToast(msg) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.classList.remove('hidden');
+      setTimeout(() => el.classList.add('hidden'), 2600);
+    }
+
+    function getMemberName(id) {
+      if (id === 'POOL') return '💰 公數 Pool';
+      const m = state.members.find(x => x.id === id);
+      return m ? m.name : '未知';
+    }
+
+    function getSharesInOriginalCurrency(tx) {
+      const shares = {};
+      state.members.forEach(m => shares[m.id] = 0);
+      const activeIds = (tx.participants || []).filter(id => state.members.some(m => m.id === id));
+      if (activeIds.length === 0) return shares;
+
+      if (tx.splitMode === 'exact' && tx.exactAmounts) {
+        activeIds.forEach(id => {
+          shares[id] = Number(tx.exactAmounts[id]) || 0;
+        });
+      } else {
+        const each = Number(tx.amount) / activeIds.length;
+        activeIds.forEach(id => {
+          shares[id] = each;
+        });
+      }
+      return shares;
+    }
+
+    /**
+     * 核心會計引擎：
+     * 直接以「公數原幣 (例如 JPY)」精確儲存每個人嘅公數戶口結餘 (poolInMain, poolSpentMain, poolBalanceMain)
+     * 確保清公數退返原幣嗰陣，1 Yen 都唔會有匯率四捨五入誤差！
+     */
+    function calculateLedger() {
+      const poolCur = state.poolCurrency || 'JPY';
+      const poolRate = state.rates[poolCur] || 1;
+
+      const ledger = {};
+      state.members.forEach(m => {
+        ledger[m.id] = {
+          id: m.id,
+          name: m.name,
+          poolInMain: 0,         // 累積夾入公數 (原幣, e.g. JPY)
+          poolSpentMain: 0,      // 累積由公數扣除消費 (原幣, e.g. JPY)
+          poolBalanceMain: 0,    // 個人公數原幣結餘 = poolInMain - poolSpentMain
+          poolBalanceHKD: 0,     // 折合港幣價值
+          privatePaidHKD: 0,     // 私人墊支 (HKD)
+          privateConsumedHKD: 0, // 私人單據消費 (HKD)
+          privateNetHKD: 0,      // 私人數淨額 (HKD)
+          finalNetHKD: 0         // 港幣過數最終應收(+) / 應付(-)
+        };
+      });
+
+      let totalTripExpenseHKD = 0;
+      let totalPoolInMain = 0;
+      let totalPoolOutMain = 0;
+
+      state.transactions.forEach(tx => {
+        const txRate = state.rates[tx.currency] || 1;
+        const amountHKD = Number(tx.amount) * txRate;
+        // 如果單據貨幣同公數主貨幣一樣，直接用原幣值；萬一唔同貨幣，先按匯率轉做公數主貨幣
+        const toPoolMainFactor = (tx.currency === poolCur) ? 1 : (txRate / poolRate);
+        const sharesOrig = getSharesInOriginalCurrency(tx);
+
+        if (tx.type === 'pool_topup') {
+          const amountInPoolCur = Number(tx.amount) * toPoolMainFactor;
+          totalPoolInMain += amountInPoolCur;
+          Object.entries(sharesOrig).forEach(([mId, origAmt]) => {
+            if (ledger[mId] && origAmt > 0) {
+              const mainAmt = origAmt * toPoolMainFactor;
+              ledger[mId].poolInMain += mainAmt;
+              ledger[mId].poolBalanceMain += mainAmt;
+            }
+          });
+        } else {
+          totalTripExpenseHKD += amountHKD;
+          if (tx.payer === 'POOL') {
+            const amountInPoolCur = Number(tx.amount) * toPoolMainFactor;
+            totalPoolOutMain += amountInPoolCur;
+            Object.entries(sharesOrig).forEach(([mId, origAmt]) => {
+              if (ledger[mId] && origAmt > 0) {
+                const mainAmt = origAmt * toPoolMainFactor;
+                ledger[mId].poolSpentMain += mainAmt;
+                ledger[mId].poolBalanceMain -= mainAmt;
+              }
+            });
+          } else {
+            if (ledger[tx.payer]) {
+              ledger[tx.payer].privatePaidHKD += amountHKD;
+            }
+            Object.entries(sharesOrig).forEach(([mId, origAmt]) => {
+              if (ledger[mId] && origAmt > 0) {
+                ledger[mId].privateConsumedHKD += origAmt * txRate;
+              }
+            });
+          }
+        }
+      });
+
+      const poolRemainingMain = totalPoolInMain - totalPoolOutMain;
+      const poolRemainingHKD = poolRemainingMain * poolRate;
+      const custodianId = state.members.some(m => m.id === state.poolCustodian)
+        ? state.poolCustodian
+        : (state.members[0]?.id || null);
+      const custodianName = getMemberName(custodianId);
+
+      // 產生「原幣清公數動作清單 (nativePoolActions)」同埋「港幣過數 Net Balance」
+      const nativePoolActions = [];
+
+      state.members.forEach(m => {
+        const item = ledger[m.id];
+        item.poolBalanceHKD = item.poolBalanceMain * poolRate;
+        item.privateNetHKD = item.privatePaidHKD - item.privateConsumedHKD;
+
+        if (state.poolSettleMode === 'refund_native') {
+          // 模式 1 (預設): 公數用原幣 (JPY/KRW) 獨立清數！私人數用港幣獨立過數！
+          item.finalNetHKD = item.privateNetHKD;
+
+          if (item.poolBalanceMain < -0.5) {
+            // 呢個人透支咗公數，要補返原幣入公數袋
+            nativePoolActions.push({
+              type: 'pay_to_pool',
+              memberId: m.id,
+              memberName: m.name,
+              custodianName,
+              amountMain: Math.abs(item.poolBalanceMain),
+              amountHKD: Math.abs(item.poolBalanceHKD)
+            });
+          } else if (item.poolBalanceMain > 0.5) {
+            // 呢個人喺公數袋仲有原幣結餘，由公數袋退返原幣現金俾佢
+            nativePoolActions.push({
+              type: m.id === custodianId ? 'custodian_keep' : 'refund_from_pool',
+              memberId: m.id,
+              memberName: m.name,
+              custodianName,
+              amountMain: item.poolBalanceMain,
+              amountHKD: item.poolBalanceHKD
+            });
+          }
+        } else if (state.poolSettleMode === 'active') {
+          // 模式 2: 旅程進行中 (公數繼續留住用，只追討透支負數嘅人補返原幣入公數袋)
+          item.finalNetHKD = item.privateNetHKD;
+          if (item.poolBalanceMain < -0.5) {
+            nativePoolActions.push({
+              type: 'pay_to_pool',
+              memberId: m.id,
+              memberName: m.name,
+              custodianName,
+              amountMain: Math.abs(item.poolBalanceMain),
+              amountHKD: Math.abs(item.poolBalanceHKD)
+            });
+          }
+        } else if (state.poolSettleMode === 'refund_hkd') {
+          // 模式 3: 公數折合港幣連同私人數一併過數
+          item.finalNetHKD = item.privateNetHKD + item.poolBalanceHKD;
+          if (m.id === custodianId) {
+            item.finalNetHKD -= poolRemainingHKD;
+          }
+        }
+      });
+
+      // 計算港幣最少過數次數方案 (Greedy Debt Simplification)
+      const debtors = [];
+      const creditors = [];
+      Object.values(ledger).forEach(p => {
+        if (p.finalNetHKD < -0.5) debtors.push({ id: p.id, name: p.name, amt: -p.finalNetHKD });
+        else if (p.finalNetHKD > 0.5) creditors.push({ id: p.id, name: p.name, amt: p.finalNetHKD });
+      });
+      debtors.sort((a, b) => b.amt - a.amt);
+      creditors.sort((a, b) => b.amt - a.amt);
+
+      const transfers = [];
+      let i = 0, j = 0;
+      while (i < debtors.length && j < creditors.length) {
+        const pay = Math.min(debtors[i].amt, creditors[j].amt);
+        if (pay > 0.5) {
+          transfers.push({
+            from: debtors[i].name,
+            to: creditors[j].name,
+            amountHKD: pay
+          });
+        }
+        debtors[i].amt -= pay;
+        creditors[j].amt -= pay;
+        if (debtors[i].amt < 0.5) i++;
+        if (creditors[j].amt < 0.5) j++;
+      }
+
+      return {
+        poolCur,
+        poolRate,
+        totalTripExpenseHKD,
+        totalPoolInMain,
+        totalPoolOutMain,
+        poolRemainingMain,
+        poolRemainingHKD,
+        ledger,
+        nativePoolActions,
+        transfers,
+        custodianId,
+        custodianName
+      };
+    }
+
+    function formatMoney(num, cur = 'HKD') {
+      const sym = CURRENCY_SYMBOLS[cur] || (cur + ' ');
+      const isZeroDec = ['JPY', 'KRW', 'TWD'].includes(cur);
+      const val = Number(num || 0);
+      return `${sym} ${val.toLocaleString('en-US', {
+        minimumFractionDigits: isZeroDec ? 0 : 1,
+        maximumFractionDigits: isZeroDec ? 0 : 1
+      })}`;
+    }
+
+    function renderAll() {
+      const summary = calculateLedger();
+      const sym = CURRENCY_SYMBOLS[summary.poolCur] || summary.poolCur;
+
+      document.querySelectorAll('.poolCurText').forEach(el => {
+        el.textContent = summary.poolCur;
+      });
+
+      document.getElementById('tripTitleDisplay').innerHTML = `<span>${state.tripTitle}</span><span class="text-xs opacity-75">✏️</span>`;
+      document.getElementById('totalTripHKD').textContent = `HK$ ${Math.round(summary.totalTripExpenseHKD).toLocaleString()}`;
+      document.getElementById('poolMainCurrencyBadge').textContent = summary.poolCur;
+      document.getElementById('poolRemainingDisplay').textContent = formatMoney(summary.poolRemainingMain, summary.poolCur);
+      document.getElementById('poolRemainingHKDDisplay').textContent = `≈ HK$ ${Math.round(summary.poolRemainingHKD).toLocaleString()}`;
+      document.getElementById('poolTotalInDisplay').textContent = formatMoney(summary.totalPoolInMain, summary.poolCur);
+      document.getElementById('poolTotalOutDisplay').textContent = formatMoney(summary.totalPoolOutMain, summary.poolCur);
+
+      // 渲染頂部每個人嘅獨立公數原幣結餘膠囊
+      const balBox = document.getElementById('memberPoolBalances');
+      balBox.innerHTML = state.members.map(m => {
+        const info = summary.ledger[m.id];
+        const mainBal = Math.round(info.poolBalanceMain);
+        let badgeClass = 'bg-white/95 text-slate-900';
+        if (mainBal < 0) badgeClass = 'bg-red-600 text-white';
+        else if (mainBal === 0 && info.poolInMain === 0) badgeClass = 'bg-amber-900/20 text-amber-950';
+
+        return `
+          <div class="${badgeClass} px-2.5 py-1 rounded-xl shrink-0 text-[11px] font-bold shadow-2xs">
+            <span>${m.name}:</span>
+            <span>${sym}${mainBal.toLocaleString()}</span>
+          </div>
+        `;
+      }).join('');
+
+      renderExpenseList(summary);
+      renderSettlement(summary);
+      renderSettings();
+    }
+
+    function renderExpenseList(summary) {
+      document.getElementById('txCount').textContent = state.transactions.length;
+      const listEl = document.getElementById('expenseList');
+      if (state.transactions.length === 0) {
+        listEl.innerHTML = `<div class="ios-card p-8 text-center text-slate-400 text-sm">暫時未有單據，撳下面「＋記一筆」開始啦！</div>`;
+        return;
+      }
+
+      listEl.innerHTML = [...state.transactions].reverse().map(tx => {
+        const rate = state.rates[tx.currency] || 1;
+        const hkd = Number(tx.amount) * rate;
+        const shares = getSharesInOriginalCurrency(tx);
+        const activeNames = Object.entries(shares)
+          .filter(([, amt]) => amt > 0)
+          .map(([id, amt]) => `${getMemberName(id)} (${formatMoney(amt, tx.currency)})`);
+
+        const isTopup = tx.type === 'pool_topup';
+        const isPoolPay = tx.payer === 'POOL';
+
+        return `
+          <div class="ios-card p-3.5 border-l-4 ${isTopup ? 'border-emerald-500 bg-emerald-50/30' : (isPoolPay ? 'border-amber-400' : 'border-blue-500')}">
+            <div class="flex justify-between items-start">
+              <div>
+                <div class="flex items-center gap-1.5">
+                  <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-md ${isTopup ? 'bg-emerald-600 text-white' : (isPoolPay ? 'bg-amber-400 text-slate-900' : 'bg-blue-100 text-blue-800')}">
+                    ${isTopup ? '💰 夾公數入池' : (isPoolPay ? '💰 公數Pool出錢' : `💳 ${getMemberName(tx.payer)} 墊支`)}
+                  </span>
+                  <span class="text-[11px] text-slate-400">${tx.date || ''}</span>
+                </div>
+                <h4 class="font-bold text-sm text-slate-800 mt-1">${tx.title}</h4>
+              </div>
+              <div class="text-right">
+                <div class="font-extrabold text-sm text-slate-900">${formatMoney(tx.amount, tx.currency)}</div>
+                <div class="text-[11px] text-slate-500 font-semibold">≈ HK$ ${hkd.toFixed(1)}</div>
+              </div>
+            </div>
+            <div class="mt-2 pt-2 border-t border-slate-100 flex justify-between items-center gap-2">
+              <div class="text-[11px] text-slate-600 leading-relaxed">
+                <span class="font-bold">${isTopup ? '入池成員 (加原幣公數)：' : (isPoolPay ? '有份食 (扣原幣公數)：' : '有份夾：')}</span>
+                ${activeNames.join('、')}
+              </div>
+              <button onclick="deleteTx('${tx.id}')" class="text-xs text-red-500 font-bold shrink-0 px-2 py-1 rounded hover:bg-red-50">刪除</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderSettlement(summary) {
+      const btnNative = document.getElementById('btnModeRefundNative');
+      const btnActive = document.getElementById('btnModeActive');
+      const btnHKD = document.getElementById('btnModeRefundHKD');
+
+      const activeClass = 'py-2 px-1.5 rounded-xl text-xs font-bold border text-center bg-amber-400 text-slate-900 border-amber-500 shadow-xs';
+      const inactiveClass = 'py-2 px-1.5 rounded-xl text-xs font-bold border text-center bg-slate-50 text-slate-600 border-slate-200';
+
+      btnNative.className = state.poolSettleMode === 'refund_native' ? activeClass : inactiveClass;
+      btnActive.className = state.poolSettleMode === 'active'
+        ? 'py-2 px-1.5 rounded-xl text-xs font-bold border text-center bg-blue-600 text-white border-blue-600 shadow-xs'
+        : inactiveClass;
+      btnHKD.className = state.poolSettleMode === 'refund_hkd' ? activeClass : inactiveClass;
+
+      const sel = document.getElementById('poolCustodianSelect');
+      sel.innerHTML = state.members.map(m =>
+        `<option value="${m.id}" ${m.id === summary.custodianId ? 'selected' : ''}>${m.name} (目前公數袋現金: ${formatMoney(summary.poolRemainingMain, summary.poolCur)})</option>`
+      ).join('');
+
+      // 渲染區塊 A：原幣清公數卡片
+      const nativeCard = document.getElementById('nativePoolSettlementCard');
+      const nativeSubtitle = document.getElementById('nativePoolSubtitle');
+      const nativeList = document.getElementById('nativePoolActionsList');
+
+      if (state.poolSettleMode === 'refund_hkd') {
+        nativeCard.classList.add('hidden');
+      } else {
+        nativeCard.classList.remove('hidden');
+        if (state.poolSettleMode === 'refund_native') {
+          nativeSubtitle.innerHTML = `公數銀包現有 <b>${formatMoney(summary.poolRemainingMain, summary.poolCur)}</b>，由 <b>${summary.custodianName}</b> 按以下原幣金額派返俾大家：`;
+        } else {
+          nativeSubtitle.innerHTML = `公數袋現有 <b>${formatMoney(summary.poolRemainingMain, summary.poolCur)}</b> 繼續留住用。以下只列出公數透支(負數)需補錢嘅人：`;
+        }
+
+        if (summary.nativePoolActions.length === 0) {
+          nativeList.innerHTML = `<div class="bg-white/90 border border-amber-200 text-amber-900 rounded-xl p-3 text-center text-xs font-bold">✅ 公數袋無人透支，正數結餘留喺公數袋繼續用！</div>`;
+        } else {
+          nativeList.innerHTML = summary.nativePoolActions.map(act => {
+            if (act.type === 'pay_to_pool') {
+              return `
+                <div class="flex justify-between items-center bg-red-50 border border-red-200 rounded-xl px-3 py-2.5">
+                  <div class="text-xs font-bold text-red-900">
+                    <span class="bg-red-600 text-white px-2 py-0.5 rounded-md mr-1">補夾公數</span>
+                    <b>${act.memberName}</b> 補返俾公數袋 (${act.custodianName})
+                  </div>
+                  <div class="text-right">
+                    <div class="font-black text-sm text-red-600">${formatMoney(act.amountMain, summary.poolCur)}</div>
+                    <div class="text-[10px] text-red-500">≈ HK$ ${act.amountHKD.toFixed(0)}</div>
+                  </div>
+                </div>
+              `;
+            } else if (act.type === 'custodian_keep') {
+              return `
+                <div class="flex justify-between items-center bg-white border border-amber-300 rounded-xl px-3 py-2.5">
+                  <div class="text-xs font-bold text-slate-800">
+                    <span class="bg-amber-500 text-slate-900 px-2 py-0.5 rounded-md mr-1">袋主自留</span>
+                    <b>${act.memberName}</b> 喺公數袋自己留返
+                  </div>
+                  <div class="text-right">
+                    <div class="font-black text-sm text-amber-700">${formatMoney(act.amountMain, summary.poolCur)}</div>
+                    <div class="text-[10px] text-slate-400">≈ HK$ ${act.amountHKD.toFixed(0)}</div>
+                  </div>
+                </div>
+              `;
+            } else {
+              return `
+                <div class="flex justify-between items-center bg-white border border-amber-200 rounded-xl px-3 py-2.5">
+                  <div class="text-xs font-bold text-slate-800">
+                    <span class="bg-emerald-600 text-white px-2 py-0.5 rounded-md mr-1">退回原幣</span>
+                    公數袋 (${act.custodianName}) 派返俾 ➔ <b>${act.memberName}</b>
+                  </div>
+                  <div class="text-right">
+                    <div class="font-black text-sm text-emerald-700">${formatMoney(act.amountMain, summary.poolCur)}</div>
+                    <div class="text-[10px] text-slate-400">≈ HK$ ${act.amountHKD.toFixed(0)}</div>
+                  </div>
+                </div>
+              `;
+            }
+          }).join('');
+        }
+      }
+
+      // 渲染區塊 B：港幣過數清單
+      const hkdTitle = document.getElementById('hkdTransferTitle');
+      const hkdSub = document.getElementById('hkdTransferSubtitle');
+      if (state.poolSettleMode === 'refund_hkd') {
+        hkdTitle.textContent = '⚡ 總結算過數方案 (已將公數折合港幣 HKD)';
+        hkdSub.textContent = '已將各人公數原幣結餘折算為港幣，連同私人墊支數一併對沖';
+      } else {
+        hkdTitle.textContent = '💳 私人墊支找數方案 (港幣 HKD)';
+        hkdSub.textContent = '只計私人出錢墊支嘅單據（公數已於上方用原幣處理）';
+      }
+
+      const tEl = document.getElementById('settlementTransfers');
+      if (summary.transfers.length === 0) {
+        tEl.innerHTML = `<div class="bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl p-3.5 text-center text-xs font-bold">🎉 私人墊支數目完全平衡 (HK$ 0)，無人需要用港幣過數！</div>`;
+      } else {
+        tEl.innerHTML = summary.transfers.map(t => `
+          <div class="flex justify-between items-center bg-slate-50 border border-slate-200/80 rounded-2xl px-3.5 py-2.5">
+            <div class="flex items-center gap-2 text-xs font-bold">
+              <span class="bg-red-100 text-red-700 px-2 py-0.5 rounded-lg">${t.from}</span>
+              <span class="text-slate-400">PayMe/FPS 俾 ➔</span>
+              <span class="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-lg">${t.to}</span>
+            </div>
+            <div class="font-extrabold text-sm text-blue-600">HK$ ${t.amountHKD.toFixed(1)}</div>
+          </div>
+        `).join('');
+      }
+
+      // 渲染各人明細表
+      const breakdownEl = document.getElementById('memberBreakdownList');
+      breakdownEl.innerHTML = state.members.map(m => {
+        const info = summary.ledger[m.id];
+        const poolBal = info.poolBalanceMain;
+        const poolBadge = poolBal > 0.5
+          ? `<span class="text-amber-700 font-extrabold">公數應退回 ${formatMoney(poolBal, summary.poolCur)}</span>`
+          : (poolBal < -0.5
+              ? `<span class="text-red-600 font-extrabold">公數欠 ${formatMoney(Math.abs(poolBal), summary.poolCur)}</span>`
+              : `<span class="text-slate-400 font-bold">公數結餘 ${formatMoney(0, summary.poolCur)}</span>`);
+
+        return `
+          <div class="bg-slate-50 rounded-2xl p-3 border border-slate-200/70">
+            <div class="flex justify-between items-center mb-1.5">
+              <span class="font-extrabold text-sm text-slate-800">${m.name}</span>
+              ${poolBadge}
+            </div>
+            <div class="grid grid-cols-2 gap-2 text-[11px] text-slate-600 bg-white p-2.5 rounded-xl">
+              <div>
+                <div class="text-slate-400 font-semibold">💰 公數原幣戶口 (${summary.poolCur})</div>
+                <div>累積夾入: <b class="text-slate-800">${formatMoney(info.poolInMain, summary.poolCur)}</b></div>
+                <div>公數食咗: <b class="text-slate-800">${formatMoney(info.poolSpentMain, summary.poolCur)}</b></div>
+                <div>原幣結餘: <b class="${info.poolBalanceMain < 0 ? 'text-red-600' : 'text-emerald-700'}">${formatMoney(info.poolBalanceMain, summary.poolCur)}</b></div>
+              </div>
+              <div>
+                <div class="text-slate-400 font-semibold">💳 私人墊支戶口 (HKD)</div>
+                <div>私人墊支: <b class="text-slate-800">HK$ ${info.privatePaidHKD.toFixed(1)}</b></div>
+                <div>私人消費: <b class="text-slate-800">HK$ ${info.privateConsumedHKD.toFixed(1)}</b></div>
+                <div>私人淨額: <b class="${info.privateNetHKD >= 0 ? 'text-emerald-600' : 'text-red-600'}">${info.privateNetHKD >= 0 ? '+' : ''}HK$ ${info.privateNetHKD.toFixed(1)}</b></div>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderSettings() {
+      document.getElementById('memberCountDisplay').textContent = state.members.length;
+      document.getElementById('poolCurrencySelect').value = state.poolCurrency || 'JPY';
+
+      document.getElementById('memberManageList').innerHTML = state.members.map(m => `
+        <div class="bg-slate-100 px-3 py-1.5 rounded-xl flex items-center gap-2 text-xs font-bold">
+          <span>${m.name}</span>
+          <button onclick="removeMember('${m.id}')" class="text-red-500 hover:text-red-700">✕</button>
+        </div>
+      `).join('');
+
+      document.getElementById('rateSettingsList').innerHTML = Object.keys(DEFAULT_RATES).map(cur => `
+        <div class="bg-slate-50 p-2 rounded-xl border border-slate-200/60 flex items-center justify-between">
+          <span class="text-xs font-extrabold text-slate-700">${cur}</span>
+          <input type="number" step="any" value="${state.rates[cur]}" onchange="updateRate('${cur}', this.value)"
+            class="w-20 bg-white border border-slate-200 rounded-lg px-2 py-1 text-right text-xs font-bold" />
+        </div>
+      `).join('');
+    }
+
+    function switchTab(tab) {
+      ['expenses', 'settle', 'settings'].forEach(t => {
+        document.getElementById(`tab-${t}`).classList.toggle('hidden', t !== tab);
+        const nav = document.getElementById(`nav-${t}`);
+        if (t === tab) {
+          nav.classList.remove('text-slate-400');
+          nav.classList.add('text-blue-600');
+        } else {
+          nav.classList.remove('text-blue-600');
+          nav.classList.add('text-slate-400');
+        }
+      });
+    }
+
+    function openModal(defaultType = 'expense') {
+      document.getElementById('txModal').classList.remove('hidden');
+      document.getElementById('txTitle').value = '';
+      document.getElementById('txAmount').value = '';
+      document.getElementById('txDate').value = new Date().toISOString().slice(0, 10);
+      document.getElementById('txCurrency').value = state.poolCurrency || 'JPY';
+      modalPayer = 'POOL';
+      modalSplitMode = 'equal';
+      modalParticipants = state.members.map(m => m.id);
+      modalExactAmounts = {};
+      setModalType(defaultType);
+    }
+
+    function closeModal() {
+      document.getElementById('txModal').classList.add('hidden');
+    }
+
+    function setModalType(type) {
+      modalType = type;
+      const btnExp = document.getElementById('typeBtnExpense');
+      const btnTop = document.getElementById('typeBtnTopup');
+      const payerSec = document.getElementById('payerSection');
+      const partLabel = document.getElementById('participantsLabel');
+      const amtLabel = document.getElementById('amountLabel');
+
+      if (type === 'pool_topup') {
+        document.getElementById('modalTitle').textContent = '💰 夾公數入池 (按原幣記錄)';
+        btnTop.className = 'py-2 rounded-xl text-xs font-bold bg-amber-400 text-slate-900 shadow-xs';
+        btnExp.className = 'py-2 rounded-xl text-xs font-bold text-slate-500';
+        payerSec.classList.add('hidden');
+        partLabel.textContent = '邊幾個人今次有夾錢入公數 Pool？';
+        amtLabel.textContent = '今次合共夾咗幾多原幣入池？';
+      } else {
+        document.getElementById('modalTitle').textContent = '🛍️ 記一筆消費';
+        btnExp.className = 'py-2 rounded-xl text-xs font-bold bg-blue-600 text-white shadow-xs';
+        btnTop.className = 'py-2 rounded-xl text-xs font-bold text-slate-500';
+        payerSec.classList.remove('hidden');
+        partLabel.textContent = '邊幾個有份食 / 參與呢筆消費？';
+        amtLabel.textContent = '消費總金額';
+      }
+      renderModalControls();
+      updateModalPreview();
+    }
+
+    function setSplitMode(mode) {
+      modalSplitMode = mode;
+      document.getElementById('splitBtnEqual').className = mode === 'equal'
+        ? 'py-1 rounded-lg text-xs font-bold bg-white shadow-xs text-slate-800'
+        : 'py-1 rounded-lg text-xs font-bold text-slate-500';
+      document.getElementById('splitBtnExact').className = mode === 'exact'
+        ? 'py-1 rounded-lg text-xs font-bold bg-white shadow-xs text-slate-800'
+        : 'py-1 rounded-lg text-xs font-bold text-slate-500';
+      renderModalControls();
+      updateModalPreview();
+    }
+
+    function selectModalPayer(payerId) {
+      modalPayer = payerId;
+      renderModalControls();
+      updateModalPreview();
+    }
+
+    function toggleParticipant(id) {
+      if (modalParticipants.includes(id)) {
+        modalParticipants = modalParticipants.filter(x => x !== id);
+      } else {
+        modalParticipants.push(id);
+      }
+      renderModalControls();
+      updateModalPreview();
+    }
+
+    function selectAllParticipants(all) {
+      modalParticipants = all ? state.members.map(m => m.id) : [];
+      renderModalControls();
+      updateModalPreview();
+    }
+
+    function updateExactAmount(id, val) {
+      modalExactAmounts[id] = Number(val) || 0;
+      if (modalExactAmounts[id] > 0 && !modalParticipants.includes(id)) {
+        modalParticipants.push(id);
+      }
+      const sum = Object.values(modalExactAmounts).reduce((a, b) => a + b, 0);
+      document.getElementById('txAmount').value = sum;
+      updateModalPreview();
+    }
+
+    function renderModalControls() {
+      const payerBox = document.getElementById('payerButtons');
+      const poolBtn = `
+        <button type="button" onclick="selectModalPayer('POOL')"
+          class="col-span-3 py-2 px-3 rounded-xl text-xs font-extrabold border flex items-center justify-center gap-1.5 ${modalPayer === 'POOL' ? 'bg-amber-400 border-amber-500 text-slate-900 shadow-xs' : 'bg-slate-50 border-slate-200 text-slate-600'}">
+          💰 公數 Pool 出錢 (只扣下面勾選有份食嘅人嘅原幣公數)
+        </button>
+      `;
+      const memberBtns = state.members.map(m => `
+        <button type="button" onclick="selectModalPayer('${m.id}')"
+          class="py-2 px-2 rounded-xl text-xs font-bold border truncate ${modalPayer === m.id ? 'bg-blue-600 border-blue-600 text-white shadow-xs' : 'bg-slate-50 border-slate-200 text-slate-700'}">
+          💳 ${m.name}
+        </button>
+      `).join('');
+      payerBox.innerHTML = poolBtn + memberBtns;
+
+      const partBox = document.getElementById('participantListBox');
+      partBox.innerHTML = state.members.map(m => {
+        const checked = modalParticipants.includes(m.id);
+        return `
+          <div class="flex items-center justify-between bg-slate-50 px-3 py-2 rounded-xl border ${checked ? 'border-blue-400 bg-blue-50/40' : 'border-slate-200'}">
+            <label class="flex items-center gap-2 text-xs font-bold text-slate-800 flex-1 cursor-pointer">
+              <input type="checkbox" ${checked ? 'checked' : ''} onchange="toggleParticipant('${m.id}')" class="w-4 h-4 accent-blue-600 rounded" />
+              <span>${m.name}</span>
+            </label>
+            ${modalSplitMode === 'exact' ? `
+              <input type="number" step="any" placeholder="金額" value="${modalExactAmounts[m.id] || ''}"
+                oninput="updateExactAmount('${m.id}', this.value)"
+                class="w-24 bg-white border border-slate-300 rounded-lg px-2 py-1 text-right text-xs font-bold" />
+            ` : `<span id="sharePreview_${m.id}" class="text-xs font-bold text-slate-500">-</span>`}
+          </div>
+        `;
+      }).join('');
+    }
+
+    function updateModalPreview() {
+      const cur = document.getElementById('txCurrency').value;
+      const amt = Number(document.getElementById('txAmount').value) || 0;
+      const rate = state.rates[cur] || 1;
+      const hkd = amt * rate;
+      document.getElementById('hkdPreviewText').textContent = `折合 HK$ ${hkd.toFixed(1)} (匯率: ${rate})`;
+
+      const count = modalParticipants.length;
+      const each = count > 0 ? amt / count : 0;
+
+      if (modalSplitMode === 'equal') {
+        state.members.forEach(m => {
+          const el = document.getElementById(`sharePreview_${m.id}`);
+          if (el) {
+            el.textContent = modalParticipants.includes(m.id) ? formatMoney(each, cur) : '冇份 ($0)';
+          }
+        });
+      }
+
+      const alertBox = document.getElementById('poolImpactAlert');
+      if (modalType === 'pool_topup') {
+        alertBox.innerHTML = `💡 <b>入池效果：</b>已勾選 <b>${count} 人</b>，每人公數原幣戶口會增加 <b>${formatMoney(each, cur)}</b>；未勾選嘅人維持不變 ($0)。`;
+      } else if (modalPayer === 'POOL') {
+        alertBox.innerHTML = `💡 <b>公數原幣扣數效果：</b>由公數 Pool 俾，只會喺已勾選嘅 <b>${count} 個人</b>嘅原幣公數結餘每人扣 <b>${formatMoney(each, cur)}</b>。`;
+      } else {
+        alertBox.innerHTML = `💡 <b>私人墊支：</b>由 <b>${getMemberName(modalPayer)}</b> 私人出錢，已勾選嘅 <b>${count} 個人</b>每人分攤 <b>${formatMoney(each, cur)}</b> (計入港幣私人數)。`;
+      }
+    }
+
+    function saveTransaction() {
+      const title = document.getElementById('txTitle').value.trim() || (modalType === 'pool_topup' ? '夾公數入池' : '未命名消費');
+      const date = document.getElementById('txDate').value;
+      const currency = document.getElementById('txCurrency').value;
+      const amount = Number(document.getElementById('txAmount').value);
+
+      if (!amount || amount <= 0) {
+        showToast('⚠️ 請輸入有效金額！');
+        return;
+      }
+      if (modalParticipants.length === 0) {
+        showToast('⚠️ 請最少揀 1 個參與者！');
+        return;
+      }
+
+      const newTx = {
+        id: 'tx_' + Date.now(),
+        type: modalType,
+        title,
+        date,
+        currency,
+        amount,
+        payer: modalType === 'pool_topup' ? 'POOL' : modalPayer,
+        splitMode: modalSplitMode,
+        participants: [...modalParticipants],
+        exactAmounts: { ...modalExactAmounts }
+      };
+
+      state.transactions.push(newTx);
+      saveState();
+      closeModal();
+      showToast('✅ 已儲存單據！');
+    }
+
+    function deleteTx(id) {
+      state.transactions = state.transactions.filter(t => t.id !== id);
+      saveState();
+      showToast('🗑️ 已刪除單據');
+    }
+
+    function setPoolSettleMode(mode) {
+      state.poolSettleMode = mode;
+      saveState();
+    }
+
+    function changeCustodian(id) {
+      state.poolCustodian = id;
+      saveState();
+    }
+
+    function editTripTitle() {
+      const next = prompt('輸入旅程名稱：', state.tripTitle);
+      if (next && next.trim()) {
+        state.tripTitle = next.trim();
+        saveState();
+      }
+    }
+
+    function addMember() {
+      const inp = document.getElementById('newMemberInput');
+      const name = inp.value.trim();
+      if (!name) return;
+      state.members.push({ id: 'm_' + Date.now(), name });
+      inp.value = '';
+      saveState();
+      showToast(`👋 已加入旅伴：${name}`);
+    }
+
+    function removeMember(id) {
+      if (state.members.length <= 2) {
+        showToast('⚠️ 最少要保留 2 位旅伴');
+        return;
+      }
+      state.members = state.members.filter(m => m.id !== id);
+      saveState();
+    }
+
+    function updateRate(cur, val) {
+      const num = Number(val);
+      if (num > 0) {
+        state.rates[cur] = num;
+        saveState();
+      }
+    }
+
+    function changePoolCurrency(cur) {
+      state.poolCurrency = cur;
+      saveState();
+    }
+
+    // 複製 WhatsApp 找數清單 (清楚分開「公數原幣清數」同「私人墊支港幣過數」)
+    function copyWhatsAppSummary() {
+      const s = calculateLedger();
+      const lines = [];
+      lines.push(`🧾 *【${state.tripTitle} - 找數結算表】*`);
+      lines.push(`━━━━━━━━━━━━━━`);
+      lines.push(`💰 *公數 Pool 現況 (原幣 ${s.poolCur})*`);
+      lines.push(`• 累積入池：${formatMoney(s.totalPoolInMain, s.poolCur)}`);
+      lines.push(`• 公數已洗：${formatMoney(s.totalPoolOutMain, s.poolCur)}`);
+      lines.push(`• 公數袋剩餘現金：*${formatMoney(s.poolRemainingMain, s.poolCur)}*`);
+      lines.push(``);
+
+      if (state.poolSettleMode === 'refund_native') {
+        lines.push(`💵 *【公數袋原幣 (${s.poolCur}) 清數方案】*`);
+        if (s.nativePoolActions.length === 0) {
+          lines.push(`• 公數已全部用完 ($0)，無需退還`);
+        } else {
+          s.nativePoolActions.forEach(act => {
+            if (act.type === 'pay_to_pool') {
+              lines.push(`👉 *${act.memberName}* 補返 *${formatMoney(act.amountMain, s.poolCur)}* 入公數袋 (${act.custodianName})`);
+            } else if (act.type === 'custodian_keep') {
+              lines.push(`👉 *${act.memberName}* (袋主) 喺公數袋自留 *${formatMoney(act.amountMain, s.poolCur)}*`);
+            } else {
+              lines.push(`👉 公數袋 (${act.custodianName}) 派返 *${formatMoney(act.amountMain, s.poolCur)}* 俾 *${act.memberName}*`);
+            }
+          });
+        }
+        lines.push(``);
+      }
+
+      lines.push(`💳 *【私人墊支港幣 (HKD) 過數方案】*`);
+      if (s.transfers.length === 0) {
+        lines.push(`🎉 私人墊支數完全平衡 (HK$ 0)，唔使過數！`);
+      } else {
+        s.transfers.forEach(t => {
+          lines.push(`👉 *${t.from}* PayMe/FPS *HK$ ${t.amountHKD.toFixed(1)}* 俾 *${t.to}*`);
+        });
+      }
+
+      navigator.clipboard.writeText(lines.join('\n')).then(() => {
+        showToast('📲 已複製 WhatsApp 原幣+港幣找數表！');
+      });
+    }
+
+    function exportCSV() {
+      const s = calculateLedger();
+      const memberHeaders = state.members.map(m => `${m.name}(原幣分攤)`).join(',');
+      const rows = [
+        `日期,類型,項目,貨幣,原幣總額,匯率,折合港幣(HKD),付款方,${memberHeaders}`
+      ];
+
+      state.transactions.forEach(tx => {
+        const rate = state.rates[tx.currency] || 1;
+        const hkd = Number(tx.amount) * rate;
+        const shares = getSharesInOriginalCurrency(tx);
+        const cols = state.members.map(m => (shares[m.id] || 0).toFixed(1));
+        rows.push([
+          tx.date || '',
+          tx.type === 'pool_topup' ? '夾公數入池' : '消費',
+          `"${(tx.title || '').replace(/"/g, '""')}"`,
+          tx.currency,
+          tx.amount,
+          rate,
+          hkd.toFixed(2),
+          getMemberName(tx.payer),
+          ...cols
+        ].join(','));
+      });
+
+      rows.push('');
+      rows.push(`--- 各人公數原幣 (${s.poolCur}) 結算表 ---`);
+      rows.push(`旅伴,累積夾入公數(${s.poolCur}),公數食咗(${s.poolCur}),應退回/補夾公數原幣(${s.poolCur}),私人墊支淨額(HKD)`);
+      state.members.forEach(m => {
+        const info = s.ledger[m.id];
+        rows.push([
+          m.name,
+          info.poolInMain.toFixed(1),
+          info.poolSpentMain.toFixed(1),
+          info.poolBalanceMain.toFixed(1),
+          info.privateNetHKD.toFixed(2)
+        ].join(','));
+      });
+
+      const blob = new Blob(['\uFEFF' + rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${state.tripTitle}_夾錢報表.csv`;
+      a.click();
+      showToast('📊 已下載 Excel CSV 報表！');
+    }
+
+    function downloadJSON() {
+      const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `trip_backup_${Date.now()}.json`;
+      a.click();
+      showToast('💾 已下載 JSON 備份檔');
+    }
+
+    function copyJSONText() {
+      navigator.clipboard.writeText(JSON.stringify(state)).then(() => {
+        showToast('📋 已複製 JSON 備份碼！');
+      });
+    }
+
+    function promptRestoreJSON() {
+      const raw = prompt('請貼上之前複製嘅 JSON 備份碼：');
+      if (!raw) return;
+      try {
+        const parsed = JSON.parse(raw);
+        if (parsed.members && parsed.transactions) {
+          state = parsed;
+          saveState();
+          showToast('✅ 成功還原備份資料！');
+        }
+      } catch (e) {
+        showToast('❌ 備份碼格式不正確');
+      }
+    }
+
+    function resetToDemo() {
+      if (confirm('確定重置為「Day1 五人夾50,000食20,000 + Day2 兩人補夾12,000」示範數據？')) {
+        state = getDemoState();
+        saveState();
+        showToast('🔄 已載入原幣清公數示範數據');
+      }
+    }
+
+    renderAll();
+  </script>
+</body>
+</html>
